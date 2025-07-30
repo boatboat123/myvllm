@@ -1117,12 +1117,20 @@ class LLMEngine:
             if params is not None and params.output_kind == (
                     RequestOutputKind.DELTA) and not seq_group.is_finished():
                 continue
+            
+            # 提取embedding----------
+            embedding = None
+            if hasattr(seq_group,"pooled_data"):
+                #假设pooled_data就是embedding
+                embedding = seq_group.pooled_data
 
             request_output = RequestOutputFactory.create(
                 seq_group,
                 self.seq_id_to_seq_group,
                 use_cache=self.use_cached_outputs,
+                embedding=embedding,#新增参数
             )
+            #--------------
             if request_output:
                 ctx.request_outputs.append(request_output)
 

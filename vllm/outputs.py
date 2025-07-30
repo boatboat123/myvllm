@@ -118,6 +118,8 @@ class RequestOutput:
         *,
         multi_modal_placeholders: Optional[MultiModalPlaceholderDict] = None,
         kv_transfer_params: Optional[dict[str, Any]] = None,
+        #增加字段
+        embedding: Optional[np.ndarray] = None,
         # Forward compatibility, code that uses args added in new release can
         # still run with older versions of vLLM without breaking.
         **kwargs: Any,
@@ -138,6 +140,47 @@ class RequestOutput:
         self.encoder_prompt_token_ids = encoder_prompt_token_ids
         self.num_cached_tokens = num_cached_tokens
         self.kv_transfer_params = kv_transfer_params
+        #增加字段
+        self.embedding = embedding
+
+    # 为保存加载添加序列化反序列化
+    def to_dict(self) -> dict:
+        return {
+            "request_id": self.request_id,
+            "prompt": self.prompt,
+            "prompt_token_ids": self.prompt_token_ids,
+            "multi_modal_placeholders": self.multi_modal_placeholders,
+            "prompt_logprobs": self.prompt_logprobs,
+            "outputs": [output.__dict__ for output in self.outputs],
+            "finished": self.finished,
+            "metrics": self.metrics,
+            "lora_request": self.lora_request,
+            "encoder_prompt": self.encoder_prompt,
+            "encoder_prompt_token_ids": self.encoder_prompt_token_ids,
+            "num_cached_tokens": self.num_cached_tokens,
+            "kv_transfer_params": self.kv_transfer_params,
+            "embedding": self.embedding.tolist() if self.embedding is not None else None,
+        }
+    
+    @classmethod
+    def from_dict(cls, d: dict) -> "RequestOutput":
+        obj = cls(
+            request_id=d["request_id"],
+            prompt=d.get("prompt"),
+            prompt_token_ids=d.get("prompt_token_ids"),
+            prompt_logprobs=d.get("prompt_logprobs"),
+            outputs=[CompletionOutput(**o) for o in d["outputs"]],
+            finished=d["finished"],
+            metrics=d.get("metrics"),
+            lora_request=d.get("lora_request"),
+            encoder_prompt=d.get("encoder_prompt"),
+            encoder_prompt_token_ids=d.get("encoder_prompt_token_ids"),
+            num_cached_tokens=d.get("num_cached_tokens"),
+            multi_modal_placeholders=d.get("multi_modal_placeholders"),
+            kv_transfer_params=d.get("kv_transfer_params"),
+            embedding=np.array(d["embedding"]) if d.get("embedding") is not None else None,
+        )
+        return obj
 
     def add(self, next_output: "RequestOutput", aggregate: bool) -> None:
         """Merge subsequent RequestOutput into this one"""
@@ -173,7 +216,8 @@ class RequestOutput:
     @classmethod
     def from_seq_group(
         cls, seq_group: SequenceGroup, use_cache: bool,
-        seq_id_to_seq_group: dict[str, SequenceGroupBase]
+        seq_id_to_seq_group: dict[str, SequenceGroupBase],
+        embedding: Optional[Any] = None,  # 新增参数
     ) -> Optional["RequestOutput"]:
         finished = seq_group.is_finished()
 
@@ -323,7 +367,8 @@ class RequestOutput:
             "encoder_prompt": encoder_prompt,
             "encoder_prompt_token_ids": encoder_prompt_token_ids,
             "num_cached_tokens": num_cached_tokens,
-            "multi_modal_placeholders": seq_group.multi_modal_placeholders
+            "multi_modal_placeholders": seq_group.multi_modal_placeholders,
+            "embedding": embedding,#新增
         }
 
         if use_cache:
@@ -395,12 +440,16 @@ class RequestOutputFactory:
     @staticmethod
     def create(seq_group: SequenceGroup,
                seq_id_to_seq_group: dict[str, SequenceGroupBase],
-               use_cache: bool = False):
+               use_cache: bool = False,
+               embedding: Optional[Any] = None,#新增参数
+               ):
         if seq_group.pooled_data is not None:
             return PoolingRequestOutput.from_seq_group(seq_group)
         else:
             return RequestOutput.from_seq_group(seq_group, use_cache,
-                                                seq_id_to_seq_group)
+                                                seq_id_to_seq_group,
+                                                embedding=embedding#传递embedding
+                                                )
 
 
 @dataclass

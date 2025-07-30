@@ -56,6 +56,7 @@ def main(args: dict):
         prompt = output.prompt
         generated_text = output.outputs[0].text
         print(f"Prompt: {prompt!r}\nGenerated text: {generated_text!r}")
+        print("Embedding:", output.embedding)  # 这里会打印 embedding
         print("-" * 50)
 
 
